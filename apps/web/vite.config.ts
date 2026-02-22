@@ -20,6 +20,7 @@ export default defineConfig({
     rollupOptions: {
       external: [
         'hono',
+        'hono/proxy',
         '@hono/auth-js',
         '@hono/auth-js/react',
         '@auth/core',
