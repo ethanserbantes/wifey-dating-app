@@ -5,7 +5,10 @@ export async function moderatePhoto({ userId, imageUrl, purpose }) {
   }
 
   try {
-    const resp = await fetch("/api/moderation/photo", {
+    const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "";
+    const endpoint = baseURL ? `${baseURL}/api/moderation/photo` : "/api/moderation/photo";
+    
+    const resp = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

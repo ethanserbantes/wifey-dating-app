@@ -7,17 +7,21 @@ function useUpload() {
   const upload = React.useCallback(async (input) => {
     try {
       setLoading(true);
+      const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "";
       let response;
       if ('reactNativeAsset' in input && input.reactNativeAsset) {
         if (input.reactNativeAsset.file) {
           const formData = new FormData();
           formData.append('file', input.reactNativeAsset.file);
-          response = await fetch('/_create/api/upload/', {
+          const uploadUrl = baseURL ? `${baseURL}/_create/api/upload/` : "/_create/api/upload/";
+          response = await fetch(uploadUrl, {
             method: 'POST',
             body: formData,
           });
         } else {
-          const response = await fetch('/_create/api/upload/presign/', {
+          const presignUrl = baseURL ? `${baseURL}/_create/api/upload/presign/` : "/_create/api/upload/presign/";
+          
+          const response = await fetch(presignUrl, {
             method: 'POST',
           });
           const { secureSignature, secureExpire } = await response.json();
@@ -33,7 +37,8 @@ function useUpload() {
           };
         }
       } else if ('url' in input) {
-        response = await fetch('/_create/api/upload/', {
+        const uploadUrl = baseURL ? `${baseURL}/_create/api/upload/` : "/_create/api/upload/";
+        response = await fetch(uploadUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -41,7 +46,8 @@ function useUpload() {
           body: JSON.stringify({ url: input.url }),
         });
       } else if ('base64' in input) {
-        response = await fetch('/_create/api/upload/', {
+        const uploadUrl = baseURL ? `${baseURL}/_create/api/upload/` : "/_create/api/upload/";
+        response = await fetch(uploadUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -49,7 +55,8 @@ function useUpload() {
           body: JSON.stringify({ base64: input.base64 }),
         });
       } else {
-        response = await fetch('/_create/api/upload/', {
+        const uploadUrl = baseURL ? `${baseURL}/_create/api/upload/` : "/_create/api/upload/";
+        response = await fetch(uploadUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/octet-stream',

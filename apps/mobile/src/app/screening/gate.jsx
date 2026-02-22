@@ -215,41 +215,34 @@ export default function ScreeningGate() {
 
   const pickSelfie = useCallback(async () => {
     try {
-      const perm = await RNImagePicker.requestCameraPermissionsAsync();
-      const granted = perm?.status === "granted";
-
-      if (granted) {
-        const result = await RNImagePicker.launchCameraAsync({
-          mediaTypes: RNImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          quality: 0.9,
-        });
-        if (!result.canceled) {
-          setSelectedImage(result.assets[0]);
-        }
-        return;
-      }
-
-      const libPerm = await RNImagePicker.requestMediaLibraryPermissionsAsync();
-      if (libPerm?.status !== "granted") {
-        Alert.alert(
-          "Permission needed",
-          "Please allow camera or photo library access to upload a verification photo.",
-        );
-        return;
-      }
-
-      const result = await RNImagePicker.launchImageLibraryAsync({
+      // Try camera first (iOS will show native permission dialog)
+      const result = await RNImagePicker.launchCameraAsync({
         mediaTypes: RNImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         quality: 0.9,
+        allowsMultiple: false,
       });
-      if (!result.canceled) {
+      
+      if (!result.canceled && result.assets?.[0]) {
         setSelectedImage(result.assets[0]);
+        return;
+      }
+
+      // Fallback to photo library if camera fails or user cancels
+      if (result.canceled) {
+        const libResult = await RNImagePicker.launchImageLibraryAsync({
+          mediaTypes: RNImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          quality: 0.9,
+          allowsMultiple: false,
+        });
+        if (!libResult.canceled && libResult.assets?.[0]) {
+          setSelectedImage(libResult.assets[0]);
+        }
       }
     } catch (e) {
       console.error(e);
-      Alert.alert("Error", "Could not open camera/photos.");
+      Alert.alert("Error", "Could not open camera. Please check permissions in Settings.");
     }
   }, []);
 
@@ -302,7 +295,10 @@ export default function ScreeningGate() {
         );
       }
 
-      const resp = await fetch("/api/profile/verification", {
+      const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "";
+      const verificationUrl = baseURL ? `${baseURL}/api/profile/verification` : "/api/profile/verification";
+      
+      const resp = await fetch(verificationUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -321,9 +317,13 @@ export default function ScreeningGate() {
       setProfile(json?.profile || profile);
       setSelectedImage(null);
 
-      // Immediately move to a dedicated reviewing screen (spinner), then it auto-advances.
-      // After success, send them back to this pre-quiz gate so they still see the intro screen.
-      router.replace("/screening/reviewing?next=/screening/gate");
+      // Photo submitted and verified. Update local state and proceed to quiz.
+      // Save the profile data so user doesn't re-enter on reload
+      await AsyncStorage.setItem("profile", JSON.stringify(json?.profile || profile));
+      
+      // Photo submitted to admin for review. User can immediately proceed to quiz.
+      // Admin will review the photo in the dashboard later.
+      router.replace("/screening/quiz");
     } catch (e) {
       console.error(e);
       Alert.alert("Error", e?.message || "Could not submit verification.");

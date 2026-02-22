@@ -3,6 +3,10 @@ import { createReadableStreamFromReadable } from '@react-router/node';
 
 const app = express();
 
+// Inject backend API URL into client-side environment
+const backendUrl = process.env.REACT_APP_API_URL || process.env.VITE_API_URL || 'http://localhost:3001';
+console.log(`📡 Admin dashboard configured to use backend: ${backendUrl}`);
+
 // Serve static assets in production
 app.use(express.static('build/client', { maxAge: '1y' }));
 
