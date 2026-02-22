@@ -1,0 +1,31 @@
+"use client";
+
+import { useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+export default function RootLayout({ children }) {
+  // Create per-session QueryClient (avoids sharing cache across users during SSR)
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 1000 * 60 * 5, // 5 minutes
+            cacheTime: 1000 * 60 * 30, // 30 minutes
+            retry: 1,
+            refetchOnWindowFocus: false,
+          },
+        },
+      }),
+  );
+
+  return (
+    <html lang="en">
+      <body>
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
+      </body>
+    </html>
+  );
+}

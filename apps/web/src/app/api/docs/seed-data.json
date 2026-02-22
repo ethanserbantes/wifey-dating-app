@@ -1,0 +1,129 @@
+{
+  "_description": "Seed data SQL for local development. Copy the 'sql' value and run against a fresh Wifey schema.",
+  "_usage": "psql $DATABASE_URL -f seed-data.sql  OR  paste into your DB client",
+
+  "sql": [
+    "-- ============================================================",
+    "-- WIFEY SEED DATA — for local development & testing",
+    "-- ============================================================",
+    "",
+    "-- ADMIN USER (use /api/admin/setup to create in production)",
+    "INSERT INTO admin_users (email, password_hash, role) VALUES ('admin@wifey.app', '$argon2id$v=19$m=65536,t=3,p=4$placeholder$placeholder', 'OWNER') ON CONFLICT (email) DO NOTHING;",
+    "",
+    "-- TEST USER 1: Female, approved, San Francisco",
+    "INSERT INTO users (id, email, password_hash, status, screening_phase) VALUES (1000, '+14155550001', '$argon2id$v=19$m=65536,t=3,p=4$seed$seed1', 'APPROVED', 1) ON CONFLICT (email) DO UPDATE SET status = 'APPROVED';",
+    "INSERT INTO user_profiles (user_id, display_name, age, birthdate, gender, bio, photos, location, lat, lng, is_visible, is_verified, verification_status, phone_number) VALUES (1000, 'Sarah', 25, '2001-03-15', 'Female', 'Coffee lover | Dog mom | Sunset chaser', '[\"https://picsum.photos/seed/sarah1/400/600\",\"https://picsum.photos/seed/sarah2/400/600\",\"https://picsum.photos/seed/sarah3/400/600\"]'::jsonb, 'San Francisco, CA', 37.7749, -122.4194, true, true, 'approved', '+14155550001') ON CONFLICT (user_id) DO UPDATE SET display_name = EXCLUDED.display_name;",
+    "",
+    "-- TEST USER 2: Male, approved, San Francisco",
+    "INSERT INTO users (id, email, password_hash, status, screening_phase) VALUES (1001, '+14155550002', '$argon2id$v=19$m=65536,t=3,p=4$seed$seed2', 'APPROVED', 1) ON CONFLICT (email) DO UPDATE SET status = 'APPROVED';",
+    "INSERT INTO user_profiles (user_id, display_name, age, birthdate, gender, bio, photos, location, lat, lng, is_visible, is_verified, verification_status, phone_number) VALUES (1001, 'James', 28, '1998-07-22', 'Male', 'Startup founder by day, chef by night', '[\"https://picsum.photos/seed/james1/400/600\",\"https://picsum.photos/seed/james2/400/600\"]'::jsonb, 'San Francisco, CA', 37.7849, -122.4094, true, true, 'approved', '+14155550002') ON CONFLICT (user_id) DO UPDATE SET display_name = EXCLUDED.display_name;",
+    "",
+    "-- TEST USER 3: Female, approved",
+    "INSERT INTO users (id, email, password_hash, status, screening_phase) VALUES (1002, '+14155550003', '$argon2id$v=19$m=65536,t=3,p=4$seed$seed3', 'APPROVED', 1) ON CONFLICT (email) DO UPDATE SET status = 'APPROVED';",
+    "INSERT INTO user_profiles (user_id, display_name, age, birthdate, gender, bio, photos, location, lat, lng, is_visible, is_verified, verification_status, phone_number) VALUES (1002, 'Emma', 26, '2000-01-10', 'Female', 'Artist | Yoga | Bookworm', '[\"https://picsum.photos/seed/emma1/400/600\",\"https://picsum.photos/seed/emma2/400/600\"]'::jsonb, 'San Francisco, CA', 37.7649, -122.4294, true, true, 'approved', '+14155550003') ON CONFLICT (user_id) DO UPDATE SET display_name = EXCLUDED.display_name;",
+    "",
+    "-- TEST USER 4: Male, pending screening (for testing quiz flow)",
+    "INSERT INTO users (id, email, password_hash, status, screening_phase) VALUES (1003, '+14155550004', '$argon2id$v=19$m=65536,t=3,p=4$seed$seed4', 'PENDING_SCREENING', 1) ON CONFLICT (email) DO UPDATE SET status = 'PENDING_SCREENING';",
+    "INSERT INTO user_profiles (user_id, display_name, age, birthdate, gender, bio, photos, location, lat, lng, is_visible, is_verified, verification_status, phone_number) VALUES (1003, 'Mike', 30, '1996-06-05', 'Male', 'Just getting started!', '[\"https://picsum.photos/seed/mike1/400/600\"]'::jsonb, 'Oakland, CA', 37.8044, -122.2712, true, false, 'pending', '+14155550004') ON CONFLICT (user_id) DO UPDATE SET display_name = EXCLUDED.display_name;",
+    "",
+    "-- DATE CREDIT WALLETS",
+    "INSERT INTO date_credit_wallets (user_id, balance_cents) VALUES (1000, 6000), (1001, 3000), (1002, 9000), (1003, 0) ON CONFLICT (user_id) DO UPDATE SET balance_cents = EXCLUDED.balance_cents;",
+    "",
+    "-- MUTUAL LIKES → MATCH between Sarah (1000) and James (1001)",
+    "INSERT INTO profile_likes (from_user_id, to_user_id, section_type, comment_text, status, pending_hidden, matched_at) VALUES (1000, 1001, 'photo', 'Love that chef photo!', 'matched', false, NOW()), (1001, 1000, 'prompt', NULL, 'matched', false, NOW()) ON CONFLICT (from_user_id, to_user_id) DO NOTHING;",
+    "INSERT INTO matches (id, user1_id, user2_id, user1_seen_at, user2_seen_at) VALUES (5000, 1000, 1001, NOW(), NOW()) ON CONFLICT (user1_id, user2_id) DO NOTHING;",
+    "",
+    "-- ACTIVE CONVERSATION STATE",
+    "INSERT INTO match_conversation_states (match_id, user1_id, user2_id, user1_consented_at, user2_consented_at, active_at) VALUES (5000, 1000, 1001, NOW(), NOW(), NOW()) ON CONFLICT (match_id) DO NOTHING;",
+    "",
+    "-- SAMPLE CHAT MESSAGES",
+    "INSERT INTO chat_messages (match_id, sender_id, message_text, message_type, is_read, created_at) VALUES (5000, 1000, 'Hey James! That pasta looks amazing', 'TEXT', true, NOW() - interval '2 hours'), (5000, 1001, 'Thanks! Its my grandma recipe. Do you cook?', 'TEXT', true, NOW() - interval '1 hour 50 minutes'), (5000, 1000, 'I try! Mostly baking — cookies are my specialty', 'TEXT', true, NOW() - interval '1 hour 40 minutes'), (5000, 1001, 'We should swap recipes sometime!', 'TEXT', false, NOW() - interval '30 minutes');",
+    "",
+    "-- PENDING INBOUND LIKE (Emma → James)",
+    "INSERT INTO profile_likes (from_user_id, to_user_id, section_type, comment_text, status, pending_hidden) VALUES (1002, 1001, 'photo', 'Great smile!', 'pending_hidden', true) ON CONFLICT (from_user_id, to_user_id) DO NOTHING;",
+    "",
+    "-- NOTIFICATION PREFERENCES",
+    "INSERT INTO user_notification_preferences (user_id, enable_all, mute_all, new_likes, new_matches, new_messages, promotions, announcements) VALUES (1000, true, false, true, true, true, true, true), (1001, true, false, true, true, true, false, false), (1002, true, false, true, true, true, true, true) ON CONFLICT (user_id) DO NOTHING;",
+    "",
+    "-- ONLINE PRESENCE",
+    "INSERT INTO user_presence_latest (user_id, last_seen_at, platform) VALUES (1000, NOW(), 'ios'), (1001, NOW() - interval '3 minutes', 'ios'), (1002, NOW() - interval '2 hours', 'ios') ON CONFLICT (user_id) DO UPDATE SET last_seen_at = EXCLUDED.last_seen_at;",
+    "",
+    "-- LOCATIONS",
+    "INSERT INTO user_location_latest (user_id, lat, lng, accuracy_m) VALUES (1000, 37.7749, -122.4194, 10), (1001, 37.7849, -122.4094, 15) ON CONFLICT (user_id) DO UPDATE SET lat = EXCLUDED.lat, lng = EXCLUDED.lng;",
+    "",
+    "-- PROFILE CATEGORIES",
+    "INSERT INTO profile_categories (name, emoji, is_active, sort_order) VALUES ('New Here', '✨', true, 1), ('Verified', '✓', true, 2), ('Foodies', '🍕', true, 3), ('Active', '🏃', true, 4), ('Creative', '🎨', true, 5), ('Travelers', '✈️', true, 6) ON CONFLICT DO NOTHING;",
+    "",
+    "-- PROPOSED DATE PLAN",
+    "INSERT INTO match_date_plans (match_id, date_status, proposed_by_user_id, date_start, date_end, place_label, activity_label, credit_amount_cents, credit_status, planner_prefs) VALUES (5000, 'proposed', 1001, NOW() + interval '3 days', NOW() + interval '3 days' + interval '2 hours', 'Blue Bottle Coffee, Hayes Valley', 'Coffee & Walk', 3000, 'pending', '{\"vibe\": \"casual\", \"budget\": \"moderate\"}'::jsonb) ON CONFLICT (match_id) DO NOTHING;",
+    "",
+    "-- ACTIVE CONVERSATION TRACKING",
+    "INSERT INTO user_active_conversations (user_id, active_match_id) VALUES (1000, 5000), (1001, 5000) ON CONFLICT (user_id) DO UPDATE SET active_match_id = EXCLUDED.active_match_id;",
+    "",
+    "-- LEDGER ENTRIES (purchase history)",
+    "INSERT INTO date_credit_ledger (user_id, match_id, action, amount_cents, meta) VALUES (1000, NULL, 'PURCHASE', 3000, '{\"source\": \"revenuecat\", \"product_id\": \"date_credit_pro\"}'::jsonb), (1000, NULL, 'PURCHASE', 3000, '{\"source\": \"client_claim\", \"product_id\": \"date_credit_pro\"}'::jsonb), (1001, NULL, 'PURCHASE', 3000, '{\"source\": \"revenuecat\", \"product_id\": \"date_credit_pro\"}'::jsonb), (1002, NULL, 'PURCHASE', 3000, '{\"source\": \"client_claim\", \"product_id\": \"date_credit_pro\"}'::jsonb), (1002, NULL, 'PURCHASE', 3000, '{\"source\": \"client_claim\", \"product_id\": \"date_credit_pro\"}'::jsonb), (1002, NULL, 'PURCHASE', 3000, '{\"source\": \"client_claim\", \"product_id\": \"date_credit_pro\"}'::jsonb);"
+  ],
+
+  "test_accounts_summary": {
+    "admin": {
+      "email": "admin@wifey.app",
+      "password": "use /api/admin/setup to create",
+      "role": "OWNER"
+    },
+    "users": [
+      {
+        "id": 1000,
+        "phone": "+14155550001",
+        "name": "Sarah",
+        "gender": "Female",
+        "status": "APPROVED",
+        "credits": 2,
+        "notes": "Has active match with James"
+      },
+      {
+        "id": 1001,
+        "phone": "+14155550002",
+        "name": "James",
+        "gender": "Male",
+        "status": "APPROVED",
+        "credits": 1,
+        "notes": "Has active match with Sarah, has pending like from Emma"
+      },
+      {
+        "id": 1002,
+        "phone": "+14155550003",
+        "name": "Emma",
+        "gender": "Female",
+        "status": "APPROVED",
+        "credits": 3,
+        "notes": "Sent a like to James (pending)"
+      },
+      {
+        "id": 1003,
+        "phone": "+14155550004",
+        "name": "Mike",
+        "gender": "Male",
+        "status": "PENDING_SCREENING",
+        "credits": 0,
+        "notes": "Not yet screened, for testing quiz flow"
+      }
+    ],
+    "matches": [
+      {
+        "id": 5000,
+        "users": "Sarah (1000) ↔ James (1001)",
+        "state": "active chat",
+        "messages": 4,
+        "date_plan": "proposed (Coffee & Walk)"
+      }
+    ],
+    "pending_likes": [
+      {
+        "from": "Emma (1002)",
+        "to": "James (1001)",
+        "comment": "Great smile!",
+        "status": "pending_hidden"
+      }
+    ]
+  }
+}

@@ -1,0 +1,3 @@
+export const MINIMUM_MESSAGES_EACH_USER = 2;
+export const DISMISS_COOLDOWN_HOURS = 72;
+export const NOT_SURE_COOLDOWN_DAYS = 7;

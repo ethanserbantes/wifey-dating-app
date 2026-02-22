@@ -1,0 +1,1132 @@
+{
+  "info": {
+    "name": "Wifey Dating App API",
+    "_postman_id": "wifey-dating-app-v1",
+    "description": "Complete Postman collection for the Wifey dating platform.\n\n## Setup\n1. Import this collection into Postman\n2. Set the `baseUrl` variable to your local dev server (default: http://localhost:4000)\n3. Run **Auth > Send OTP** then **Auth > Verify OTP** to get a JWT\n4. The JWT is auto-saved to the `apiJwt` variable for all subsequent requests\n5. `userId` is auto-saved from login — used by most endpoints\n\n## Auth\n- Mobile endpoints use Bearer token (HMAC JWT from OTP flow)\n- Admin endpoints use session cookie (from /api/admin/login)\n- RevenueCat webhook uses its own secret header\n\n## Variables\n- `baseUrl` — API host (default: http://localhost:4000)\n- `apiJwt` — auto-populated after OTP verify\n- `userId` — auto-populated after OTP verify/register\n- `matchId` — set manually or from match list\n- `messageId` — set manually for message reactions\n- `otherUserId` — target user for like/pass/block",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000", "type": "string" },
+    { "key": "apiJwt", "value": "", "type": "string" },
+    { "key": "userId", "value": "", "type": "string" },
+    { "key": "matchId", "value": "1", "type": "string" },
+    { "key": "messageId", "value": "1", "type": "string" },
+    { "key": "otherUserId", "value": "2", "type": "string" },
+    { "key": "phone", "value": "+14155551234", "type": "string" },
+    { "key": "adminSessionToken", "value": "", "type": "string" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{apiJwt}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "description": "OTP-based authentication flow. Run Send → Verify → (optional) Register in order.",
+      "item": [
+        {
+          "name": "Send OTP",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/otp/send",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{phone}}\"\n}"
+            },
+            "description": "Send a 6-digit OTP via Twilio SMS.\n\nRate limits:\n- 3 per phone per 10 min\n- 15 per phone per day\n- 40 per IP per hour"
+          }
+        },
+        {
+          "name": "Verify OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.apiJwt) {",
+                  "  pm.collectionVariables.set('apiJwt', json.apiJwt);",
+                  "  pm.collectionVariables.set('userId', String(json.user.id));",
+                  "  console.log('Saved apiJwt and userId=' + json.user.id);",
+                  "}",
+                  "if (json.verificationToken) {",
+                  "  pm.collectionVariables.set('verificationToken', json.verificationToken);",
+                  "  console.log('New user — saved verificationToken');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/otp/verify",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{phone}}\",\n  \"code\": \"123456\"\n}"
+            },
+            "description": "Verify OTP code.\n\nReturns:\n- Existing user: { apiJwt, user }\n- New user: { needsRegistration, verificationToken }\n\nAuto-saves apiJwt and userId to collection variables."
+          }
+        },
+        {
+          "name": "Register (new user)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.apiJwt) {",
+                  "  pm.collectionVariables.set('apiJwt', json.apiJwt);",
+                  "  pm.collectionVariables.set('userId', String(json.user.id));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/otp/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{phone}}\",\n  \"verificationToken\": \"{{verificationToken}}\",\n  \"name\": \"Test User\",\n  \"birthdate\": \"1998-06-15\",\n  \"gender\": \"Female\",\n  \"verificationPhotoUrl\": \"https://example.com/selfie.jpg\"\n}"
+            },
+            "description": "Complete registration after OTP verify returned needsRegistration=true.\nRequires verificationToken from the verify step."
+          }
+        },
+        {
+          "name": "Get Auth Token (web session)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/auth/token",
+            "auth": { "type": "noauth" },
+            "description": "Exchange NextAuth session cookie for raw JWT. Used by Expo WebView auth bridge."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "me"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Ensure User (web auth)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/users/ensure",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "Request Account Deletion",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/users/delete",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" }
+          }
+        },
+        {
+          "name": "Cancel Account Deletion",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/users/delete/cancel",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" }
+          }
+        },
+        {
+          "name": "Check Deletion Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/users/delete/status?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "delete", "status"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Block User",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/profiles/block",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"blockedUserId\": {{otherUserId}}\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/profile/me?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "profile", "me"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Update My Profile",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/profile/me",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"displayName\": \"Test User\",\n  \"age\": 26,\n  \"gender\": \"Female\",\n  \"bio\": \"Love hiking and coffee ☕\",\n  \"photos\": [\"https://example.com/photo1.jpg\"],\n  \"location\": \"San Francisco, CA\",\n  \"lat\": 37.7749,\n  \"lng\": -122.4194,\n  \"preferences\": {\n    \"basics\": { \"height\": \"5'6\\\"\" },\n    \"interests\": [\"hiking\", \"coffee\", \"travel\"]\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Submit Verification Selfie",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/profile/verification",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"verificationPhotoUrl\": \"https://example.com/selfie.jpg\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Dating Insights",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/dating-insights?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "dating-insights"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Discovery",
+      "item": [
+        {
+          "name": "Get Feed",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/profiles/feed?userId={{userId}}&minAge=21&maxAge=35&gender=all&maxDistance=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "profiles", "feed"],
+              "query": [
+                { "key": "userId", "value": "{{userId}}" },
+                { "key": "minAge", "value": "21" },
+                { "key": "maxAge", "value": "35" },
+                { "key": "gender", "value": "all" },
+                { "key": "maxDistance", "value": "50" },
+                { "key": "minHeightInches", "value": "", "disabled": true },
+                { "key": "maxHeightInches", "value": "", "disabled": true },
+                { "key": "baseLat", "value": "", "disabled": true },
+                { "key": "baseLng", "value": "", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Categories",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/discover/categories?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "discover", "categories"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Get Category Feed",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/discover/category-feed?userId={{userId}}&category=Adventurous",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "discover", "category-feed"],
+              "query": [
+                { "key": "userId", "value": "{{userId}}" },
+                { "key": "category", "value": "Adventurous" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Standouts",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/discover/standouts?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "discover", "standouts"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Likes",
+      "item": [
+        {
+          "name": "Like a Profile",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/profiles/like",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fromUserId\": {{userId}},\n  \"toUserId\": {{otherUserId}},\n  \"sectionType\": \"photo\",\n  \"sectionKey\": \"0\",\n  \"commentText\": \"Great photo!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Undo Like (Rewind)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/profiles/like",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fromUserId\": {{userId}},\n  \"toUserId\": {{otherUserId}}\n}"
+            }
+          }
+        },
+        {
+          "name": "Pass on Profile",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/profiles/pass",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fromUserId\": {{userId}},\n  \"toUserId\": {{otherUserId}}\n}"
+            }
+          }
+        },
+        {
+          "name": "Get My Likes (Received)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/likes/me?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "likes", "me"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Get Likes Badge Count",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/likes/badge?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "likes", "badge"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Mark Likes Seen",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/likes/mark-seen",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Matches",
+      "item": [
+        {
+          "name": "List Matches",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/matches?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "matches"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            },
+            "description": "Returns all matches with message stats, conversation state, date status, and pending match count."
+          }
+        },
+        {
+          "name": "Get Match Details",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/matches/{{matchId}}?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "matches", "{{matchId}}"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Get Match Summary",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/matches/summary?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "matches", "summary"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Mark Matches Seen",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/matches/mark-seen",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"matchIds\": [{{matchId}}]\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Who Likes Me (Inbound Boost)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/matches/likes-me?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "matches", "likes-me"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Get Conversation Starter",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/matches/{{matchId}}/starter?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "matches", "{{matchId}}", "starter"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Unmatch",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/matches/{{matchId}}/unmatch",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"reasonCode\": \"not_interested\",\n  \"reasonText\": \"\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Block from Match",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/matches/{{matchId}}/block",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" }
+          }
+        },
+        {
+          "name": "We Met (IRL confirmation)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/matches/{{matchId}}/we-met",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Messages",
+      "item": [
+        {
+          "name": "Get Messages",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/messages/{{matchId}}?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "messages", "{{matchId}}"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            },
+            "description": "Returns messages array + conversationState. Also marks messages as read and may start the 24h decision timer."
+          }
+        },
+        {
+          "name": "Send Text Message",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/messages/send",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"matchId\": {{matchId}},\n  \"senderId\": {{userId}},\n  \"messageText\": \"Hey! How's your day going?\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Send Voice Memo",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/messages/send",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"matchId\": {{matchId}},\n  \"senderId\": {{userId}},\n  \"audioUrl\": \"https://example.com/voice-memo.m4a\",\n  \"audioDurationMs\": 4500\n}"
+            }
+          }
+        },
+        {
+          "name": "Reply to Message",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/messages/send",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"matchId\": {{matchId}},\n  \"senderId\": {{userId}},\n  \"messageText\": \"That's so cool!\",\n  \"repliedToMessageId\": {{messageId}}\n}"
+            }
+          }
+        },
+        {
+          "name": "Like/Unlike Message",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/messages/{{matchId}}/likes/{{messageId}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Conversations",
+      "description": "Pre-Chat → Active Chat state machine",
+      "item": [
+        {
+          "name": "Get Consent Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/conversations/consent/{{matchId}}?userId={{userId}}&tier=serious",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "conversations", "consent", "{{matchId}}"],
+              "query": [
+                { "key": "userId", "value": "{{userId}}" },
+                { "key": "tier", "value": "serious" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Give Consent (Move to Chat)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/conversations/consent/{{matchId}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"tier\": \"serious\"\n}"
+            },
+            "description": "Both users must consent. When both have consented AND both have $30 credit balance, the chat activates."
+          }
+        },
+        {
+          "name": "Get Active Conversation",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/conversations/active?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "conversations", "active"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Mark Pre-Chat Seen",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/conversations/prechat-seen/{{matchId}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" },
+            "description": "Starts the 24h decision timer for the receiver."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Date Credits",
+      "item": [
+        {
+          "name": "Get Wallet Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/date-credits/status?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "date-credits", "status"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            },
+            "description": "Returns balance in cents, computed credits (max 3), and required amount ($30 = 3000 cents)."
+          }
+        },
+        {
+          "name": "Claim Purchase (Client-side)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/date-credits/claim",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"date_credit_pro\",\n  \"transactionId\": \"2000000123456789\"\n}"
+            },
+            "description": "Idempotent. Also checks webhook-applied transactions to avoid double-crediting."
+          }
+        },
+        {
+          "name": "Get Chat Escrow Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/chat-escrow/{{matchId}}?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "chat-escrow", "{{matchId}}"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Date Planning",
+      "item": [
+        {
+          "name": "Get Date Plan",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/matches/{{matchId}}/date?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "matches", "{{matchId}}", "date"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Save Date Preferences",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/matches/{{matchId}}/date/prefs",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"prefs\": {\n    \"vibe\": \"casual\",\n    \"budget\": \"moderate\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Propose Date",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/matches/{{matchId}}/date/propose",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"dateStart\": \"2026-03-01T18:00:00.000Z\",\n  \"dateEnd\": \"2026-03-01T20:00:00.000Z\",\n  \"placeLabel\": \"Blue Bottle Coffee\",\n  \"placeId\": \"ChIJ...\",\n  \"activityLabel\": \"Coffee & Walk\",\n  \"coverImageUrl\": \"https://example.com/place.jpg\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Respond to Date (Accept/Decline)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/matches/{{matchId}}/date/respond",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"response\": \"accept\"\n}"
+            },
+            "description": "response: 'accept' or 'decline'"
+          }
+        },
+        {
+          "name": "Cancel Date",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/matches/{{matchId}}/date/cancel",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" }
+          }
+        },
+        {
+          "name": "Submit Date Feedback",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/matches/{{matchId}}/date/feedback",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"rating\": 5,\n  \"feedback\": \"Had a great time!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Check Pending Feedback",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/date-feedback/pending?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "date-feedback", "pending"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Availability",
+      "item": [
+        {
+          "name": "Get Availability",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/matches/{{matchId}}/availability?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "matches", "{{matchId}}", "availability"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Save Availability",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/matches/{{matchId}}/availability/save",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"days\": [\"Saturday\", \"Sunday\"],\n  \"times\": [\"Morning\", \"Afternoon\"]\n}"
+            }
+          }
+        },
+        {
+          "name": "Skip Availability Prompt",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/matches/{{matchId}}/availability/skip",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Drink Perk",
+      "item": [
+        {
+          "name": "Get Drink Perk Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/drink-perk/{{matchId}}?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "drink-perk", "{{matchId}}"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Proximity Ping",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/drink-perk/{{matchId}}/ping",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"lat\": 37.7749,\n  \"lng\": -122.4194\n}"
+            }
+          }
+        },
+        {
+          "name": "Start Handshake",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/drink-perk/{{matchId}}/handshake/start",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" }
+          }
+        },
+        {
+          "name": "Confirm Handshake",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/drink-perk/{{matchId}}/handshake/confirm",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"code\": \"ABC123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Handshake Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/drink-perk/{{matchId}}/handshake/status?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "drink-perk",
+                "{{matchId}}",
+                "handshake",
+                "status"
+              ],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Get All Ready Perks",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/drink-perk/ready?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "drink-perk", "ready"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Screening (Quiz)",
+      "item": [
+        {
+          "name": "Get Active Quiz",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/quiz/active?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "quiz", "active"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Start Quiz Attempt",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/quiz/start",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" }
+          }
+        },
+        {
+          "name": "Submit Answer",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/quiz/answer",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"attemptId\": 1,\n  \"questionId\": 1,\n  \"answerIds\": [1]\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Rank",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/quiz/rank?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "quiz", "rank"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Get Stats",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/quiz/stats?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "quiz", "stats"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Push Notifications",
+      "item": [
+        {
+          "name": "Register Push Token",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/push/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"expoPushToken\": \"ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]\",\n  \"platform\": \"ios\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get/Update Preferences",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/push/preferences?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "push", "preferences"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Send Test Push",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/push/test",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Presence",
+      "item": [
+        {
+          "name": "Ping (Update Last Seen)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/presence/ping",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"platform\": \"ios\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Places",
+      "item": [
+        {
+          "name": "Autocomplete",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/places/autocomplete?input=Blue Bottle Coffee&lat=37.7749&lng=-122.4194",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "places", "autocomplete"],
+              "query": [
+                { "key": "input", "value": "Blue Bottle Coffee" },
+                { "key": "lat", "value": "37.7749" },
+                { "key": "lng", "value": "-122.4194" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Place Details",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/places/details?placeId=ChIJ...",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "places", "details"],
+              "query": [{ "key": "placeId", "value": "ChIJ..." }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Subscription",
+      "item": [
+        {
+          "name": "Get Override",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/subscription/override?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "subscription", "override"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Moderation",
+      "item": [
+        {
+          "name": "Moderate Photo",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/moderation/photo",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"imageUrl\": \"https://example.com/photo.jpg\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Submit Report",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/reports",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reporterUserId\": {{userId}},\n  \"reportedUserId\": {{otherUserId}},\n  \"reportType\": \"INAPPROPRIATE_CONTENT\",\n  \"description\": \"Inappropriate photos\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhooks",
+      "item": [
+        {
+          "name": "RevenueCat Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/revenuecat/webhook",
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "RevenueCat Purchase Webhook",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/revenuecat/webhook",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              {
+                "key": "Authorization",
+                "value": "Bearer YOUR_REVENUE_CAT_WEBHOOK_SECRET"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": {\n    \"id\": \"evt_test_001\",\n    \"type\": \"INITIAL_PURCHASE\",\n    \"app_user_id\": \"{{userId}}\",\n    \"product_id\": \"date_credit_pro\",\n    \"transaction_id\": \"2000000999999999\",\n    \"store\": \"APP_STORE\",\n    \"environment\": \"SANDBOX\",\n    \"price\": 29.99,\n    \"currency\": \"USD\"\n  }\n}"
+            },
+            "description": "Simulate a RevenueCat purchase webhook. Replace Authorization header with your actual secret."
+          }
+        },
+        {
+          "name": "Link RevenueCat User",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/revenuecat/link",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"appUserId\": \"$RCAnonymousID:test-1234-abcd\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin (by tag)",
+      "description": "Admin endpoints — listed by category. All use session cookie auth from POST /api/admin/login.\n\n**Auth:** POST /api/admin/login, POST /api/admin/logout, GET /api/admin/me\n**Users:** GET/POST /api/admin/users, GET/PUT/DELETE /api/admin/users/:id\n**User Actions:** POST approve, reset, partial-reset, delete, subscription override, date-credit grant\n**Quiz Builder:** full CRUD for versions, phases, questions, lifetime rules\n**Reports:** GET /api/admin/reports\n**Verifications:** GET list, POST approve/deny/ban\n**Support:** GET/POST tickets + messages\n**Analytics:** GET /api/admin/analytics, /api/admin/engagement\n**Bans:** GET/POST screening bans, behavior bans\n**Fake Profiles:** full CRUD + like-as-fake\n**Likes Throttle:** GET/PUT settings, GET user throttle status\n**Categories:** GET/POST /api/admin/categories\n**Matches:** POST manual match, GET match messages, POST activate-chat\n**Password:** POST change, request reset, confirm reset",
+      "item": [
+        {
+          "name": "Admin Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const cookies = pm.response.headers.filter(h => h.key.toLowerCase() === 'set-cookie');",
+                  "if (cookies.length > 0) {",
+                  "  console.log('Admin session cookie set');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/admin/login",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@wifey.app\",\n  \"password\": \"your-admin-password\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Admin Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/admin/health",
+            "auth": { "type": "noauth" }
+          }
+        }
+      ]
+    }
+  ]
+}

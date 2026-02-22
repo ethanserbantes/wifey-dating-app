@@ -1,0 +1,156 @@
+{
+  "_description": "Standardized error response formats across all Wifey API endpoints",
+
+  "universal_pattern": {
+    "_notes": "Every error response follows this shape. The 'code' field is only present for specific business-logic errors.",
+    "shape": {
+      "error": "string — always present, human-readable",
+      "code": "string — optional machine-readable code"
+    }
+  },
+
+  "http_status_codes": {
+    "400": {
+      "meaning": "Bad Request — missing or invalid input",
+      "examples": [
+        { "error": "User ID required" },
+        { "error": "Phone and code are required" },
+        {
+          "error": "Please enter a valid phone number. Tip: include country code like +1."
+        },
+        { "error": "Invalid birthdate" },
+        { "error": "Gender must be Male or Female" },
+        { "error": "messageText or audioUrl required" },
+        { "error": "Invalid productId" },
+        { "error": "transactionId is required" },
+        { "error": "Invalid JSON" },
+        { "error": "Photo rejected" },
+        { "error": "Invalid lat" }
+      ]
+    },
+    "401": {
+      "meaning": "Unauthorized — auth failed or invalid code",
+      "examples": [
+        { "error": "Unauthorized" },
+        { "error": "Invalid code. Please check and try again." },
+        {
+          "error": "Your verification code has expired. Please request a new one."
+        },
+        {
+          "error": "Phone verification expired. Please request a new code and try again."
+        },
+        { "error": "Unauthorized (or userId missing)" }
+      ]
+    },
+    "402": {
+      "meaning": "Payment Required — date credit needed",
+      "examples": [
+        {
+          "error": "Date credit required to message in an active chat",
+          "code": "DATE_CREDIT_REQUIRED",
+          "requiredCents": 3000
+        },
+        {
+          "error": "Date credit required to start an active chat.",
+          "code": "DATE_CREDIT_REQUIRED",
+          "requiredCents": 3000,
+          "missingUserIds": [42, 99]
+        }
+      ]
+    },
+    "404": {
+      "meaning": "Not Found",
+      "examples": [
+        { "error": "Match not found" },
+        { "error": "User not found" },
+        { "error": "Match not found (or you don't have access)" },
+        { "error": "Reply target not found in this chat" }
+      ]
+    },
+    "409": {
+      "meaning": "Conflict — business rule violation",
+      "examples": [
+        {
+          "error": "This account is scheduled for deletion. You can restore it now.",
+          "code": "ACCOUNT_PENDING_DELETION",
+          "userId": 42,
+          "deleteScheduledFor": "2026-03-23T00:00:00.000Z"
+        },
+        {
+          "error": "You are already at your active chat limit.",
+          "code": "ACTIVE_CHAT_LIMIT",
+          "status": { "myActiveChatCount": 1, "myActiveChatLimit": 1 }
+        },
+        {
+          "error": "A user is at their active chat limit.",
+          "code": "ACTIVE_CHAT_LIMIT",
+          "blockedUserId": 42
+        },
+        { "error": "Phone already registered" }
+      ]
+    },
+    "410": {
+      "meaning": "Gone — resource permanently unavailable",
+      "examples": [
+        {
+          "error": "This account was deleted. If you meant to recover it, the 30-day recovery window has passed.",
+          "code": "ACCOUNT_DELETED"
+        },
+        {
+          "error": "This match is no longer available",
+          "code": "NO_LONGER_AVAILABLE"
+        },
+        {
+          "error": "This match is no longer available.",
+          "code": "EXPIRED"
+        }
+      ]
+    },
+    "429": {
+      "meaning": "Rate Limited",
+      "examples": [
+        { "error": "Too many codes sent. Please wait a bit and try again." },
+        { "error": "Too many codes sent today. Please try again tomorrow." },
+        { "error": "Too many requests. Please slow down and try again." },
+        { "error": "Too many likes. Please slow down." }
+      ],
+      "rate_limits": {
+        "otp_send_per_phone_10min": 3,
+        "otp_send_per_phone_day": 15,
+        "otp_send_per_ip_hour": 40,
+        "likes_per_minute": 25
+      }
+    },
+    "500": {
+      "meaning": "Server Error — catch-all",
+      "examples": [
+        { "error": "Could not send code. Please try again." },
+        { "error": "Could not verify code. Please try again." },
+        { "error": "Could not create account. Please try again." },
+        { "error": "Failed to fetch profiles" },
+        { "error": "Failed to like profile" },
+        { "error": "Failed to fetch matches" },
+        { "error": "Failed to send message" },
+        { "error": "Failed to fetch messages" },
+        { "error": "Failed to fetch profile" },
+        { "error": "Failed to update profile" },
+        { "error": "Failed to fetch date credit status" },
+        { "error": "Failed to claim date credit" },
+        { "error": "Failed to load" },
+        { "error": "Failed to update" },
+        { "error": "Failed to fetch user" },
+        { "error": "Webhook secret not configured" },
+        { "error": "Webhook error", "stage": "resolve_user_id", "debug": {} }
+      ]
+    }
+  },
+
+  "machine_readable_codes": {
+    "ACCOUNT_DELETED": "Account was hard-deleted (past 30-day grace). HTTP 410.",
+    "ACCOUNT_PENDING_DELETION": "Account scheduled for deletion, can still be recovered. HTTP 409. Includes userId + deleteScheduledFor.",
+    "NO_LONGER_AVAILABLE": "Match/conversation terminated. HTTP 410.",
+    "EXPIRED": "Pre-chat decision timer expired. HTTP 410.",
+    "ACTIVE_CHAT_LIMIT": "User has max active chats (1 for default, 3 for committed). HTTP 409.",
+    "DATE_CREDIT_REQUIRED": "User needs $30 date credit to proceed. HTTP 402. Includes requiredCents."
+  }
+}

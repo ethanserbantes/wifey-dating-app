@@ -1,0 +1,156 @@
+{
+  "_description": "Webhook payload examples for all inbound webhooks used by Wifey",
+
+  "revenuecat": {
+    "_docs": "https://www.revenuecat.com/docs/integrations/webhooks",
+    "_auth": "Authorization: Bearer <REVENUE_CAT_WEBHOOK_SECRET>  OR  query param ?auth=<secret>",
+    "_accepted_event_types": [
+      "INITIAL_PURCHASE",
+      "NON_RENEWING_PURCHASE",
+      "ONE_TIME_PRODUCT_PURCHASED",
+      "PRODUCT_PURCHASED"
+    ],
+    "_accepted_product_ids": [
+      "date_credit_pro",
+      "dating_credit_pro",
+      "date_credit_1"
+    ],
+    "_notes": "Product IDs may arrive in bundle form (com.example.app.date_credit_pro) — only the trailing segment is matched.",
+
+    "purchase_event": {
+      "event": {
+        "id": "evt_abc123def456",
+        "type": "INITIAL_PURCHASE",
+        "app_user_id": "$RCAnonymousID:1234abcd-5678-efgh-9012-ijkl3456mnop",
+        "product_id": "date_credit_pro",
+        "transaction_id": "2000000123456789",
+        "original_transaction_id": "2000000123456789",
+        "aliases": [
+          "$RCAnonymousID:1234abcd-5678-efgh-9012-ijkl3456mnop",
+          "42"
+        ],
+        "subscriber_attributes": {
+          "userId": { "value": "42", "updated_at_ms": 1708000000000 }
+        },
+        "store": "APP_STORE",
+        "environment": "SANDBOX",
+        "price": 29.99,
+        "currency": "USD",
+        "purchased_at_ms": 1708000000000,
+        "event_timestamp_ms": 1708000001000
+      }
+    },
+
+    "success_response_applied": {
+      "ok": true,
+      "alreadyApplied": false
+    },
+    "success_response_duplicate": {
+      "ok": true,
+      "alreadyApplied": true
+    },
+    "success_response_pending": {
+      "ok": true,
+      "pending": true,
+      "reason": "unmapped_app_user_id",
+      "hint": "The purchase was received, but we couldn't map it to a user yet. The app should call /api/revenuecat/link; once linked, we will process pending events."
+    },
+    "success_response_ignored_product": {
+      "ok": true,
+      "ignored": true,
+      "reason": "product_id_not_whitelisted",
+      "allowedProductIds": [
+        "date_credit_pro",
+        "dating_credit_pro",
+        "date_credit_1"
+      ]
+    },
+    "success_response_ignored_event_type": {
+      "ok": true,
+      "ignored": true,
+      "reason": "event_type_not_purchase_like"
+    },
+
+    "error_response_401": {
+      "error": "Unauthorized",
+      "hint": "RevenueCat should send an Authorization header, but if your RevenueCat UI is not attaching it, set the webhook URL to /api/revenuecat/webhook?auth=<REVENUE_CAT_WEBHOOK_SECRET>",
+      "debug": {
+        "version": "2026-02-12-date-credits-pending-v1",
+        "expectedSecretLength": 32,
+        "received": {
+          "hasAuthorizationHeader": false,
+          "authorizationHeaderLength": 0
+        }
+      }
+    },
+
+    "health_check_response": {
+      "ok": true,
+      "configured": true,
+      "version": "2026-02-12-date-credits-pending-v1",
+      "expectedSecretLength": 32
+    }
+  },
+
+  "expo_push": {
+    "_docs": "https://docs.expo.dev/push-notifications/sending-notifications/",
+    "_notes": "Wifey sends pushes TO Expo, not the other way. This documents the payloads Wifey sends.",
+
+    "match_notification": {
+      "to": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+      "title": "It's a match!",
+      "body": "Sarah liked you back — say hi 👋",
+      "sound": "default",
+      "data": { "type": "match", "matchId": 123 }
+    },
+    "message_notification": {
+      "to": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+      "title": "Sarah",
+      "body": "Hey, how are you doing?",
+      "sound": "default",
+      "data": { "type": "message", "matchId": 123 }
+    },
+    "like_notification": {
+      "to": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+      "title": "New like",
+      "body": "Sarah liked you — tap to see",
+      "sound": "default",
+      "data": { "type": "like" }
+    },
+    "chat_started_notification": {
+      "to": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+      "title": "Sarah",
+      "body": "Wants to chat — tap to open",
+      "sound": "default",
+      "data": { "type": "chat_started", "matchId": 123 }
+    },
+    "date_invite_notification": {
+      "to": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+      "title": "Date idea",
+      "body": "Sarah sent you a date idea",
+      "sound": "default",
+      "data": { "type": "date_invite", "matchId": 123 }
+    },
+    "date_update_notification": {
+      "to": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+      "title": "Date update",
+      "body": "Tap to open",
+      "sound": "default",
+      "data": { "type": "date_update", "matchId": 123 }
+    },
+    "drink_ready_notification": {
+      "to": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+      "title": "You're together 🍸",
+      "body": "Open the app to unlock your Drink on Us perk.",
+      "sound": "default",
+      "data": { "type": "drink_ready", "matchId": 123 }
+    },
+    "announcement_notification": {
+      "to": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+      "title": "Update",
+      "body": "Tap to open",
+      "sound": "default",
+      "data": { "type": "announcement" }
+    }
+  }
+}

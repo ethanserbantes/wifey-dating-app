@@ -1,0 +1,1608 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Wifey Dating App API",
+    "version": "1.0.0",
+    "description": "Complete API specification for the Wifey dating platform. All authenticated mobile endpoints use Bearer token (HMAC JWT issued via OTP flow). Admin endpoints use session cookie auth."
+  },
+  "servers": [{ "url": "/api", "description": "Relative API base" }],
+  "components": {
+    "securitySchemes": {
+      "BearerOTP": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "HMAC-SHA256 JWT issued by /api/auth/otp/verify or /api/auth/otp/register. Format: wifey_otp_v1.<payload_b64url>.<sig_b64url>. 30-day TTL."
+      },
+      "AdminSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "admin_session_token",
+        "description": "Session cookie set by /api/admin/login"
+      },
+      "RevenueCatWebhook": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Authorization: Bearer <REVENUE_CAT_WEBHOOK_SECRET> or query param ?auth=<secret>"
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Human-readable error message"
+          },
+          "code": {
+            "type": "string",
+            "description": "Machine-readable error code (optional)",
+            "enum": [
+              "ACCOUNT_DELETED",
+              "ACCOUNT_PENDING_DELETION",
+              "NO_LONGER_AVAILABLE",
+              "EXPIRED",
+              "ACTIVE_CHAT_LIMIT",
+              "DATE_CREDIT_REQUIRED"
+            ]
+          }
+        },
+        "required": ["error"]
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "email": { "type": "string", "description": "Phone E.164 or email" },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING_SCREENING",
+              "APPROVED",
+              "COOLDOWN",
+              "LIFETIME_INELIGIBLE"
+            ]
+          },
+          "screeningPhase": { "type": "integer" },
+          "cooldownUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "gender": {
+            "type": "string",
+            "nullable": true,
+            "enum": ["Male", "Female"]
+          },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "UserProfile": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "user_id": { "type": "integer" },
+          "display_name": { "type": "string" },
+          "age": { "type": "integer", "nullable": true },
+          "birthdate": { "type": "string", "format": "date", "nullable": true },
+          "gender": { "type": "string", "nullable": true },
+          "bio": { "type": "string", "nullable": true },
+          "photos": {
+            "type": "array",
+            "items": { "type": "string", "format": "uri" }
+          },
+          "location": { "type": "string", "nullable": true },
+          "preferences": {
+            "type": "object",
+            "description": "Free-form JSON: { basics: { height, ... }, interests: [...], prompts: [...] }"
+          },
+          "is_visible": { "type": "boolean" },
+          "is_verified": { "type": "boolean" },
+          "lat": { "type": "number", "nullable": true },
+          "lng": { "type": "number", "nullable": true },
+          "phone_number": { "type": "string", "nullable": true },
+          "verification_status": {
+            "type": "string",
+            "enum": ["none", "pending", "approved", "rejected"]
+          },
+          "verification_photo_url": { "type": "string", "nullable": true },
+          "verified_gender": { "type": "string", "nullable": true },
+          "email": {
+            "type": "string",
+            "description": "Joined from users table"
+          }
+        }
+      },
+      "Match": {
+        "type": "object",
+        "properties": {
+          "match_id": { "type": "integer" },
+          "user_id": {
+            "type": "integer",
+            "description": "The OTHER user's id"
+          },
+          "display_name": { "type": "string" },
+          "age": { "type": "integer", "nullable": true },
+          "bio": { "type": "string", "nullable": true },
+          "photos": { "type": "array", "items": { "type": "string" } },
+          "is_new_match": { "type": "boolean" },
+          "is_online": { "type": "boolean" },
+          "last_message": { "type": "string", "nullable": true },
+          "last_message_time": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "unread_count": { "type": "integer" },
+          "real_message_count": { "type": "integer" },
+          "chat_state": {
+            "type": "string",
+            "enum": ["match", "prechat", "active", "archived", "closed"]
+          },
+          "prechat_role": {
+            "type": "string",
+            "nullable": true,
+            "enum": ["sender", "receiver"]
+          },
+          "date_status": {
+            "type": "string",
+            "enum": [
+              "none",
+              "proposed",
+              "locked",
+              "ready",
+              "unlocked",
+              "expired"
+            ]
+          },
+          "date_end": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "my_consented": { "type": "boolean" },
+          "other_consented": { "type": "boolean" },
+          "decision_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "decision_seconds_remaining": { "type": "integer", "nullable": true },
+          "terminal_state": {
+            "type": "string",
+            "nullable": true,
+            "enum": ["expired", "unavailable"]
+          },
+          "active_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "starter_summary": { "type": "string", "nullable": true },
+          "archived_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "archive_reason": { "type": "string", "nullable": true }
+        }
+      },
+      "ChatMessage": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "sender_id": { "type": "integer", "nullable": true },
+          "message_text": { "type": "string" },
+          "message_type": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "AUDIO",
+              "SYSTEM_HINT",
+              "CHAT_CREDIT_REQUIRED",
+              "DATE_FEEDBACK",
+              "SYSTEM"
+            ]
+          },
+          "audio_url": { "type": "string", "nullable": true },
+          "audio_duration_ms": { "type": "integer", "nullable": true },
+          "replied_to_message_id": { "type": "integer", "nullable": true },
+          "reply_sender_id": { "type": "integer", "nullable": true },
+          "reply_message_text": { "type": "string", "nullable": true },
+          "reply_message_type": { "type": "string", "nullable": true },
+          "reply_audio_url": { "type": "string", "nullable": true },
+          "reply_audio_duration_ms": { "type": "integer", "nullable": true },
+          "like_count": { "type": "integer" },
+          "liked_by_me": { "type": "boolean" },
+          "is_read": { "type": "boolean" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ProfileLike": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "from_user_id": { "type": "integer" },
+          "to_user_id": { "type": "integer" },
+          "section_type": {
+            "type": "string",
+            "nullable": true,
+            "description": "photo | prompt | profile"
+          },
+          "section_key": { "type": "string", "nullable": true },
+          "comment_text": { "type": "string", "nullable": true },
+          "status": {
+            "type": "string",
+            "enum": ["pending_hidden", "surfaced", "matched", "expired"]
+          },
+          "surfaced_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "matched_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ConversationState": {
+        "type": "object",
+        "properties": {
+          "match_id": { "type": "integer" },
+          "user1_id": { "type": "integer" },
+          "user2_id": { "type": "integer" },
+          "user1_consented_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "user2_consented_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "active_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "decision_started_for_user_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "decision_started_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "decision_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "terminal_state": {
+            "type": "string",
+            "nullable": true,
+            "enum": ["expired", "unavailable"]
+          },
+          "terminal_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "user1_tier": { "type": "string", "nullable": true },
+          "user2_tier": { "type": "string", "nullable": true }
+        }
+      },
+      "DateCreditWallet": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "integer" },
+          "balanceCents": {
+            "type": "integer",
+            "description": "Raw balance in cents"
+          },
+          "requiredCents": {
+            "type": "integer",
+            "description": "Always 3000 ($30)"
+          },
+          "credits": {
+            "type": "integer",
+            "description": "Computed: floor(balanceCents / 3000), max 3"
+          },
+          "maxCredits": { "type": "integer", "description": "Always 3" }
+        }
+      },
+      "DatePlan": {
+        "type": "object",
+        "properties": {
+          "match_id": { "type": "integer" },
+          "date_status": {
+            "type": "string",
+            "enum": [
+              "none",
+              "proposed",
+              "locked",
+              "ready",
+              "unlocked",
+              "expired"
+            ]
+          },
+          "proposed_by_user_id": { "type": "integer", "nullable": true },
+          "date_start": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "date_end": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "place_label": { "type": "string", "nullable": true },
+          "place_id": { "type": "string", "nullable": true },
+          "place_lat": { "type": "number", "nullable": true },
+          "place_lng": { "type": "number", "nullable": true },
+          "activity_label": { "type": "string", "nullable": true },
+          "cover_image_url": { "type": "string", "nullable": true },
+          "credit_amount_cents": { "type": "integer" },
+          "credit_status": {
+            "type": "string",
+            "enum": ["pending", "active", "spent", "expired"]
+          },
+          "planner_prefs": { "type": "object" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/auth/otp/send": {
+      "post": {
+        "summary": "Send OTP code via Twilio SMS",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": { "type": "string", "example": "+14155551234" }
+                },
+                "required": ["phone"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "ok": { "type": "boolean" } }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid phone",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited (3/10min, 15/day per phone; 40/hr per IP)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/otp/verify": {
+      "post": {
+        "summary": "Verify OTP code. Returns JWT for existing users, verificationToken for new users.",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": { "type": "string", "example": "+14155551234" },
+                  "code": { "type": "string", "example": "123456" }
+                },
+                "required": ["phone", "code"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Existing user login OR new user registration token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "description": "Existing user",
+                      "properties": {
+                        "apiJwt": { "type": "string" },
+                        "user": { "$ref": "#/components/schemas/User" }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "description": "New user — needs registration",
+                      "properties": {
+                        "needsRegistration": {
+                          "type": "boolean",
+                          "enum": [true]
+                        },
+                        "phone": { "type": "string" },
+                        "verificationToken": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "15-minute TTL, single use"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing fields",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid/expired code",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "409": {
+            "description": "Account pending deletion (code: ACCOUNT_PENDING_DELETION, includes userId + deleteScheduledFor)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "410": {
+            "description": "Account deleted (code: ACCOUNT_DELETED)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/otp/register": {
+      "post": {
+        "summary": "Register new user after OTP verification",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": { "type": "string" },
+                  "verificationToken": {
+                    "type": "string",
+                    "description": "From /auth/otp/verify"
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "Legacy fallback if no verificationToken"
+                  },
+                  "name": { "type": "string" },
+                  "birthdate": {
+                    "type": "string",
+                    "description": "YYYY-MM-DD or MM/DD/YYYY"
+                  },
+                  "gender": { "type": "string", "enum": ["Male", "Female"] },
+                  "verificationPhotoUrl": { "type": "string", "format": "uri" }
+                },
+                "required": [
+                  "phone",
+                  "name",
+                  "birthdate",
+                  "gender",
+                  "verificationPhotoUrl"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "apiJwt": { "type": "string" },
+                    "user": { "$ref": "#/components/schemas/User" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Expired verification token",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/token": {
+      "get": {
+        "summary": "Exchange NextAuth session cookie for raw JWT (used by Expo WebView auth)",
+        "tags": ["Auth"],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jwt": { "type": "string" },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string" },
+                        "email": { "type": "string" },
+                        "name": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/me": {
+      "get": {
+        "summary": "Get current user account info",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": { "$ref": "#/components/schemas/User" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profile/me": {
+      "get": {
+        "summary": "Get user's dating profile",
+        "tags": ["Profile"],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "profile": { "$ref": "#/components/schemas/UserProfile" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update user's dating profile (upsert)",
+        "tags": ["Profile"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": { "type": "integer" },
+                  "displayName": { "type": "string" },
+                  "age": { "type": "integer" },
+                  "gender": { "type": "string" },
+                  "bio": { "type": "string" },
+                  "photos": { "type": "array", "items": { "type": "string" } },
+                  "location": { "type": "string" },
+                  "preferences": { "type": "object" },
+                  "lat": { "type": "number" },
+                  "lng": { "type": "number" },
+                  "phoneNumber": { "type": "string" }
+                },
+                "required": ["userId"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "profile": { "$ref": "#/components/schemas/UserProfile" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profiles/feed": {
+      "get": {
+        "summary": "Discover feed (profiles to swipe on)",
+        "tags": ["Discovery"],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "minAge",
+            "in": "query",
+            "schema": { "type": "integer", "default": 18 }
+          },
+          {
+            "name": "maxAge",
+            "in": "query",
+            "schema": { "type": "integer", "default": 99 }
+          },
+          {
+            "name": "maxDistance",
+            "in": "query",
+            "schema": { "type": "integer", "description": "Miles" }
+          },
+          {
+            "name": "gender",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["all", "men", "women", "male", "female"]
+            }
+          },
+          {
+            "name": "minHeightInches",
+            "in": "query",
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "maxHeightInches",
+            "in": "query",
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "baseLat",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "description": "Passport mode override"
+            }
+          },
+          { "name": "baseLng", "in": "query", "schema": { "type": "number" } }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "profiles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "integer" },
+                          "display_name": { "type": "string" },
+                          "age": { "type": "integer" },
+                          "gender": { "type": "string" },
+                          "bio": { "type": "string" },
+                          "photos": {
+                            "type": "array",
+                            "items": { "type": "string" }
+                          },
+                          "location": { "type": "string" },
+                          "is_verified": { "type": "boolean" },
+                          "distance_miles": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "preferences": { "type": "object" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profiles/like": {
+      "post": {
+        "summary": "Like a profile (may create match)",
+        "tags": ["Likes"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fromUserId": { "type": "integer" },
+                  "toUserId": { "type": "integer" },
+                  "sectionType": { "type": "string", "nullable": true },
+                  "sectionKey": { "type": "string", "nullable": true },
+                  "commentText": { "type": "string", "nullable": true }
+                },
+                "required": ["fromUserId", "toUserId"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "isMatch": { "type": "boolean" },
+                    "matchId": { "type": "integer", "nullable": true },
+                    "isPending": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          },
+          "429": { "description": "Rate limited (25 likes/minute)" }
+        }
+      },
+      "delete": {
+        "summary": "Undo/rewind a like",
+        "tags": ["Likes"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fromUserId": { "type": "integer" },
+                  "toUserId": { "type": "integer" }
+                },
+                "required": ["fromUserId", "toUserId"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "removedMatch": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profiles/pass": {
+      "post": {
+        "summary": "Pass on a profile",
+        "tags": ["Likes"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fromUserId": { "type": "integer" },
+                  "toUserId": { "type": "integer" }
+                },
+                "required": ["fromUserId", "toUserId"]
+              }
+            }
+          }
+        },
+        "responses": { "200": {} }
+      }
+    },
+    "/matches": {
+      "get": {
+        "summary": "List all matches with message stats, conversation state, date status",
+        "tags": ["Matches"],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "matches": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Match" }
+                    },
+                    "pendingMatchCount": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/matches/{matchId}": {
+      "get": {
+        "summary": "Get single match details",
+        "tags": ["Matches"],
+        "parameters": [
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ]
+      }
+    },
+    "/matches/{matchId}/unmatch": {
+      "post": {
+        "summary": "Unmatch",
+        "tags": ["Matches"],
+        "parameters": [
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": { "type": "integer" },
+                  "reasonCode": { "type": "string" },
+                  "reasonText": { "type": "string", "nullable": true }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/messages/{matchId}": {
+      "get": {
+        "summary": "Get messages for a match (also starts 24h decision timer for receiver)",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "messages": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/ChatMessage" }
+                    },
+                    "conversationState": {
+                      "$ref": "#/components/schemas/ConversationState"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Match not found or blocked" },
+          "410": { "description": "Match expired" }
+        }
+      }
+    },
+    "/messages/send": {
+      "post": {
+        "summary": "Send a text or audio message",
+        "tags": ["Messages"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "matchId": { "type": "integer" },
+                  "senderId": { "type": "integer" },
+                  "messageText": { "type": "string" },
+                  "audioUrl": { "type": "string", "nullable": true },
+                  "audioDurationMs": { "type": "integer", "nullable": true },
+                  "repliedToMessageId": { "type": "integer", "nullable": true }
+                },
+                "required": ["matchId", "senderId"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "$ref": "#/components/schemas/ChatMessage" }
+                  }
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Date credit required (code: DATE_CREDIT_REQUIRED, includes requiredCents: 3000)"
+          },
+          "404": { "description": "Match not found or blocked" },
+          "410": {
+            "description": "Match no longer available (code: NO_LONGER_AVAILABLE)"
+          }
+        }
+      }
+    },
+    "/messages/{matchId}/likes/{messageId}": {
+      "post": {
+        "summary": "Like/unlike a message",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ]
+      }
+    },
+    "/conversations/consent/{matchId}": {
+      "get": {
+        "summary": "Get conversation consent status",
+        "tags": ["Conversations"],
+        "parameters": [
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "tier",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["serious", "committed"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "object",
+                      "properties": {
+                        "tier": { "type": "string", "nullable": true },
+                        "myActiveChatCount": { "type": "integer" },
+                        "myActiveChatLimit": {
+                          "type": "integer",
+                          "description": "1 for default, 3 for committed"
+                        },
+                        "myConsented": { "type": "boolean" },
+                        "otherConsented": { "type": "boolean" },
+                        "isActive": { "type": "boolean" },
+                        "terminalState": { "type": "string", "nullable": true },
+                        "decisionExpiresAt": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "decisionSecondsRemaining": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "activeAt": { "type": "string", "nullable": true }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Give consent to move match to active chat",
+        "tags": ["Conversations"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": { "type": "integer" },
+                  "tier": { "type": "string" }
+                },
+                "required": ["userId"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Consent recorded (may activate if both consented)"
+          },
+          "402": {
+            "description": "Date credit required (both users need $30 balance)"
+          },
+          "409": {
+            "description": "Active chat limit reached (code: ACTIVE_CHAT_LIMIT)"
+          },
+          "410": { "description": "Match expired or no longer available" }
+        }
+      }
+    },
+    "/date-credits/status": {
+      "get": {
+        "summary": "Get date credit wallet balance",
+        "tags": ["Date Credits"],
+        "parameters": [
+          { "name": "userId", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DateCreditWallet" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/date-credits/claim": {
+      "post": {
+        "summary": "Claim a date credit purchase (client-side Apple receipt validation)",
+        "tags": ["Date Credits"],
+        "security": [{ "BearerOTP": [] }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "productId": {
+                    "type": "string",
+                    "description": "Must be in allowlist: date_credit_pro, dating_credit_pro, date_credit_1"
+                  },
+                  "transactionId": {
+                    "type": "string",
+                    "description": "Apple StoreKit transaction ID"
+                  }
+                },
+                "required": ["productId", "transactionId"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "alreadyApplied": { "type": "boolean" },
+                    "userId": { "type": "integer" },
+                    "balanceCents": { "type": "integer" },
+                    "credits": { "type": "integer" },
+                    "maxCredits": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/revenuecat/webhook": {
+      "post": {
+        "summary": "RevenueCat webhook receiver for date credit purchases",
+        "tags": ["Webhooks"],
+        "security": [{ "RevenueCatWebhook": [] }],
+        "description": "See webhook payload examples in /api/docs/webhook-examples.json"
+      },
+      "get": {
+        "summary": "Health check — returns config status and version",
+        "tags": ["Webhooks"],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "configured": { "type": "boolean" },
+                    "version": { "type": "string" },
+                    "expectedSecretLength": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/revenuecat/link": {
+      "post": {
+        "summary": "Link RevenueCat anonymous app_user_id to our user_id",
+        "tags": ["Webhooks"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "appUserId": { "type": "string" } },
+                "required": ["appUserId"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/likes/me": {
+      "get": {
+        "summary": "Get likes received by current user",
+        "tags": ["Likes"],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ]
+      }
+    },
+    "/likes/badge": {
+      "get": {
+        "summary": "Get unseen likes count for badge",
+        "tags": ["Likes"],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "count": { "type": "integer" } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/quiz/active": {
+      "get": {
+        "summary": "Get active quiz config for user's gender",
+        "tags": ["Screening"]
+      }
+    },
+    "/quiz/start": {
+      "post": { "summary": "Start a screening attempt", "tags": ["Screening"] }
+    },
+    "/quiz/answer": {
+      "post": {
+        "summary": "Submit an answer to a screening question",
+        "tags": ["Screening"]
+      }
+    },
+    "/quiz/rank": {
+      "get": {
+        "summary": "Get screening rank/percentile",
+        "tags": ["Screening"]
+      }
+    },
+    "/quiz/stats": {
+      "get": { "summary": "Get screening stats", "tags": ["Screening"] }
+    },
+    "/push/register": {
+      "post": {
+        "summary": "Register Expo push token",
+        "tags": ["Push"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": { "type": "integer" },
+                  "expoPushToken": { "type": "string" },
+                  "platform": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/push/preferences": {
+      "get": {
+        "summary": "Get/update notification preferences",
+        "tags": ["Push"]
+      }
+    },
+    "/presence/ping": {
+      "post": {
+        "summary": "Update user presence/last-seen",
+        "tags": ["Presence"]
+      }
+    },
+    "/discover/categories": {
+      "get": {
+        "summary": "Get profile categories for discover tab",
+        "tags": ["Discovery"]
+      }
+    },
+    "/discover/category-feed": {
+      "get": { "summary": "Get profiles in a category", "tags": ["Discovery"] }
+    },
+    "/discover/standouts": {
+      "get": { "summary": "Get standout profiles", "tags": ["Discovery"] }
+    },
+    "/matches/{matchId}/date": {
+      "get": { "summary": "Get date plan for match", "tags": ["Date Planning"] }
+    },
+    "/matches/{matchId}/date/propose": {
+      "post": { "summary": "Propose a date", "tags": ["Date Planning"] }
+    },
+    "/matches/{matchId}/date/respond": {
+      "post": {
+        "summary": "Accept/decline a date proposal",
+        "tags": ["Date Planning"]
+      }
+    },
+    "/matches/{matchId}/date/cancel": {
+      "post": { "summary": "Cancel a proposed date", "tags": ["Date Planning"] }
+    },
+    "/matches/{matchId}/date/prefs": {
+      "post": {
+        "summary": "Save date planner preferences",
+        "tags": ["Date Planning"]
+      }
+    },
+    "/matches/{matchId}/date/feedback": {
+      "post": {
+        "summary": "Submit post-date feedback",
+        "tags": ["Date Planning"]
+      }
+    },
+    "/matches/{matchId}/availability": {
+      "get": { "summary": "Get match availability", "tags": ["Availability"] }
+    },
+    "/matches/{matchId}/availability/save": {
+      "post": { "summary": "Save availability", "tags": ["Availability"] }
+    },
+    "/matches/{matchId}/availability/skip": {
+      "post": {
+        "summary": "Skip/dismiss availability prompt",
+        "tags": ["Availability"]
+      }
+    },
+    "/drink-perk/{matchId}": {
+      "get": { "summary": "Get drink perk status", "tags": ["Drink Perk"] }
+    },
+    "/drink-perk/{matchId}/ping": {
+      "post": {
+        "summary": "Proximity ping for drink perk",
+        "tags": ["Drink Perk"]
+      }
+    },
+    "/drink-perk/{matchId}/handshake/start": {
+      "post": { "summary": "Start drink handshake", "tags": ["Drink Perk"] }
+    },
+    "/drink-perk/{matchId}/handshake/confirm": {
+      "post": { "summary": "Confirm drink handshake", "tags": ["Drink Perk"] }
+    },
+    "/drink-perk/{matchId}/handshake/status": {
+      "get": { "summary": "Get handshake status", "tags": ["Drink Perk"] }
+    },
+    "/chat-escrow/{matchId}": {
+      "get": { "summary": "Get chat escrow status", "tags": ["Chat Escrow"] }
+    },
+    "/places/autocomplete": {
+      "get": {
+        "summary": "Google Places autocomplete proxy",
+        "tags": ["Places"],
+        "parameters": [
+          { "name": "input", "in": "query", "schema": { "type": "string" } }
+        ]
+      }
+    },
+    "/places/details": {
+      "get": {
+        "summary": "Google Places details proxy",
+        "tags": ["Places"],
+        "parameters": [
+          { "name": "placeId", "in": "query", "schema": { "type": "string" } }
+        ]
+      }
+    },
+    "/moderation/photo": {
+      "post": {
+        "summary": "Run Google Vision SafeSearch on an image URL",
+        "tags": ["Moderation"]
+      }
+    },
+    "/reports": {
+      "post": { "summary": "Submit a user report", "tags": ["Reports"] }
+    },
+    "/users/delete": {
+      "post": {
+        "summary": "Request account deletion (30-day grace)",
+        "tags": ["Users"]
+      }
+    },
+    "/users/delete/cancel": {
+      "post": { "summary": "Cancel pending deletion", "tags": ["Users"] }
+    },
+    "/users/delete/status": {
+      "get": { "summary": "Check deletion status", "tags": ["Users"] }
+    },
+    "/profile/verification": {
+      "post": { "summary": "Submit verification selfie", "tags": ["Profile"] }
+    },
+    "/dating-insights": {
+      "get": { "summary": "Get dating insights/stats", "tags": ["Profile"] }
+    },
+    "/date-feedback/pending": {
+      "get": {
+        "summary": "Check for pending post-date feedback",
+        "tags": ["Date Planning"]
+      }
+    },
+    "/subscription/override": {
+      "get": {
+        "summary": "Get subscription override for user",
+        "tags": ["Subscription"]
+      }
+    },
+    "/matches/summary": {
+      "get": { "summary": "Get match summary stats", "tags": ["Matches"] }
+    },
+    "/matches/mark-seen": {
+      "post": { "summary": "Mark matches as seen", "tags": ["Matches"] }
+    },
+    "/matches/likes-me": {
+      "get": {
+        "summary": "Check who has liked this user (for inbound boost)",
+        "tags": ["Matches"]
+      }
+    },
+    "/conversations/active": {
+      "get": {
+        "summary": "Get user's active conversation match",
+        "tags": ["Conversations"]
+      }
+    },
+    "/conversations/prechat-seen/{matchId}": {
+      "post": {
+        "summary": "Mark prechat as seen (starts 24h timer)",
+        "tags": ["Conversations"]
+      }
+    },
+    "/matches/{matchId}/starter": {
+      "get": {
+        "summary": "Get conversation starter for a match",
+        "tags": ["Matches"]
+      }
+    },
+    "/matches/{matchId}/block": {
+      "post": {
+        "summary": "Block user from match context",
+        "tags": ["Matches"]
+      }
+    },
+    "/matches/{matchId}/we-met": {
+      "post": { "summary": "Mark that users have met IRL", "tags": ["Matches"] }
+    },
+    "/profiles/block": {
+      "post": { "summary": "Block a user", "tags": ["Users"] }
+    },
+    "/likes/mark-seen": {
+      "post": { "summary": "Mark likes as seen", "tags": ["Likes"] }
+    },
+    "/drink-perk/ready": {
+      "get": {
+        "summary": "Get all ready drink perks for user",
+        "tags": ["Drink Perk"]
+      }
+    },
+    "/push/test": {
+      "post": { "summary": "Send a test push notification", "tags": ["Push"] }
+    },
+    "/push/empty-feed": {
+      "post": {
+        "summary": "Send empty-feed notification to waitlist users",
+        "tags": ["Push"]
+      }
+    }
+  }
+}
