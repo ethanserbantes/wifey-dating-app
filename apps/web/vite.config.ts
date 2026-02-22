@@ -16,6 +16,19 @@ import { restartEnvFileChange } from './plugins/restartEnvFileChange';
 export default defineConfig({
   // Keep them available via import.meta.env.NEXT_PUBLIC_*
   envPrefix: 'NEXT_PUBLIC_',
+  build: {
+    rollupOptions: {
+      external: [
+        'hono',
+        '@hono/auth-js',
+        '@hono/auth-js/react',
+        '@auth/core',
+        'hono/context-storage',
+        '@auth/core/errors',
+        'react-router-hono-server',
+      ],
+    },
+  },
   optimizeDeps: {
     // Explicitly include fast-glob, since it gets dynamically imported and we
     // don't want that to cause a re-bundle.
