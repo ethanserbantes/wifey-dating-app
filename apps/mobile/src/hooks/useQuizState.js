@@ -4,6 +4,7 @@ import { Animated } from "react-native";
 export function useQuizState() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [quizSessionId, setQuizSessionId] = useState(null);
   const [question, setQuestion] = useState(null);
   const [progress, setProgress] = useState({
     step: 0,
@@ -37,6 +38,8 @@ export function useQuizState() {
     setLoading,
     submitting,
     setSubmitting,
+    quizSessionId,
+    setQuizSessionId,
     question,
     setQuestion,
     progress,

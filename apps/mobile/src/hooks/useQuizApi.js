@@ -24,6 +24,7 @@ export function useQuizApi({
   setShowingTransition,
   setPendingQuestion,
   setPendingProgress,
+  setQuizSessionId,
   progress,
   router,
   setAudienceGenderUsed,
@@ -133,9 +134,12 @@ export function useQuizApi({
         const audienceGender = opts?.audienceGender;
         const response = await fetch(apiUrl("/api/quiz/start"), {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${auth?.jwt}`,
+          },
           body: JSON.stringify({
-            userId: Number(userId),
+            userId: String(userId),
             // Help the server pick the correct quiz even if the profile gender is stale.
             audienceGender,
           }),
@@ -228,6 +232,7 @@ export function useQuizApi({
         setProgress(
           data.progress || { step: 1, totalSteps: 1, currentPhase: "phase_1" },
         );
+        setQuizSessionId(data.quizSessionId);
       } catch (err) {
         console.error("Error starting quiz:", err);
         setError({
@@ -254,6 +259,7 @@ export function useQuizApi({
       setPendingOutcomeNav,
       setProgress,
       setQuestion,
+      setQuizSessionId,
       setShowingTransition,
       setTransitionDurationMs,
       setTransitionMessage,
@@ -310,15 +316,19 @@ export function useQuizApi({
   ]);
 
   const submitAnswer = useCallback(
-    async (user, question, selectedAnswerIds) => {
+    async (user, question, selectedAnswerIds, quizSessionId) => {
       try {
         const response = await fetch(apiUrl("/api/quiz/answer"), {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${auth?.jwt}`,
+          },
           body: JSON.stringify({
             userId: Number(user.id),
             questionId: question.id,
-            answerIds: selectedAnswerIds,
+            selectedAnswerIds: selectedAnswerIds,
+            quizSessionId: quizSessionId,
           }),
         });
 

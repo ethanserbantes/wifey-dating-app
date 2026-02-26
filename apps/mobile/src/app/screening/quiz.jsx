@@ -26,6 +26,7 @@ export default function QuizScreen() {
   const {
     loading,
     submitting,
+    quizSessionId,
     question,
     progress,
     user,
@@ -82,7 +83,7 @@ export default function QuizScreen() {
     setSubmitting(true);
 
     try {
-      await submitAnswer(user, question, selectedAnswerIds);
+      await submitAnswer(user, question, selectedAnswerIds, quizSessionId);
       setSelectedAnswerIds([]);
     } catch (err) {
       console.error("Error submitting answer:", err);
