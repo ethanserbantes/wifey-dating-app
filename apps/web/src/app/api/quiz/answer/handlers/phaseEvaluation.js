@@ -26,14 +26,10 @@ export function evaluatePhaseThresholds(
   // IMPORTANT POLICY:
   // - Lifetime ban answers/rules -> LIFETIME_INELIGIBLE (permanent)
   // - "Too many points" / phase thresholds -> COOLDOWN (time-based, 30 days)
-  // - CRITICAL: Only check cooldown thresholds at FINAL phase (phase_7)
-  //   because thresholds span all 7 phases, not individual phases.
-  // We keep the phase rule key name `fail_if_sum_gte` for backward compat with
-  // existing quiz builder configs, but it should behave like a cooldown.
-  const isFinalPhase = state.currentPhase === "phase_7";
+  // - Check cooldown thresholds at END of EACH phase (1, 2, 3, 4)
+  // - Default: 7+ points triggers cooldown (per-phase scoring)
 
   if (
-    isFinalPhase &&
     livePhaseRules?.fail_if_sum_gte != null &&
     livePhaseScore.sum >= livePhaseRules.fail_if_sum_gte
   ) {
@@ -41,7 +37,6 @@ export function evaluatePhaseThresholds(
   }
 
   if (
-    isFinalPhase &&
     livePhaseRules?.cooldown_if_sum_gte != null &&
     livePhaseScore.sum >= livePhaseRules.cooldown_if_sum_gte
   ) {
@@ -57,16 +52,9 @@ export function determinePhaseOutcome(state, phaseRules, phaseScore) {
   let shouldApprove = false;
   let shouldCooldown = false;
 
-  // IMPORTANT: Only check cooldown thresholds at the FINAL phase (phase_7)
-  // because thresholds are designed across ALL 7 phases, not per-phase.
-  // Checking at phase_1, phase_2, etc. incorrectly fails users mid-screening.
-  const isFinalPhase = state.currentPhase === "phase_7";
-
-  // Keep fail/cooldown checks at phase end too (in case weights/rules changed mid-phase)
-  // NOTE: `fail_if_sum_gte` is treated as COOLDOWN (see policy above).
-  // Only applies at final phase.
+  // Check cooldown thresholds at END of EACH phase (1, 2, 3, 4)
+  // 7+ points per phase triggers cooldown
   if (
-    isFinalPhase &&
     phaseRules?.fail_if_sum_gte != null &&
     phaseScore.sum >= phaseRules.fail_if_sum_gte
   ) {
@@ -75,7 +63,6 @@ export function determinePhaseOutcome(state, phaseRules, phaseScore) {
 
   if (
     !shouldCooldown &&
-    isFinalPhase &&
     phaseRules?.cooldown_if_sum_gte != null &&
     phaseScore.sum >= phaseRules.cooldown_if_sum_gte
   ) {
