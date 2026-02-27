@@ -1,4 +1,5 @@
 import { Plus } from "lucide-react";
+import adminFetch from "@/utils/adminFetch";
 
 export function QuestionBankModal({
   questionBank,
@@ -10,16 +11,28 @@ export function QuestionBankModal({
   onCreate,
 }) {
   const addToPhase = async (questionId) => {
-    await fetch(
-      `/api/admin/quiz-builder/versions/${versionId}/phases/${phase}/questions`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionId }),
-      },
-    );
-    onAdd();
-    onClose();
+    try {
+      const res = await adminFetch(
+        `/api/admin/quiz-builder/versions/${versionId}/phases/${phase}/questions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ questionId }),
+        },
+      );
+
+      if (!res.ok) {
+        throw new Error(
+          `Failed to add question to phase: [${res.status}] ${res.statusText}`
+        );
+      }
+
+      onAdd();
+      onClose();
+    } catch (error) {
+      console.error(error);
+      alert("Failed to add question to phase. Please try again.");
+    }
   };
 
   return (

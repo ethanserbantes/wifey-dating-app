@@ -399,7 +399,7 @@ export function useRegisterForm(options = {}) {
         });
       }
 
-      router.replace("/screening/reviewing?next=/screening/gate");
+      router.replace("/screening/gate");
     } catch (error) {
       console.error(error);
       Alert.alert("Error", error.message);

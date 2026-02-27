@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuizBuilder } from "@/hooks/useQuizBuilder";
 import AdminLayout from "@/components/AdminLayout";
 import { QuizBuilderHeader } from "@/components/QuizBuilder/QuizBuilderHeader";
@@ -10,6 +10,7 @@ import { QuestionBankModal } from "@/components/QuizBuilder/QuestionBankModal";
 import { QuestionEditorModal } from "@/components/QuizBuilder/QuestionEditorModal";
 import { PhaseConfigModal } from "@/components/QuizBuilder/PhaseConfigModal";
 import { LifetimeRulesModal } from "@/components/QuizBuilder/LifetimeRulesModal";
+import { GlobalEscalateModal } from "@/components/QuizBuilder/GlobalEscalateModal";
 
 export default function QuizBuilderPage() {
   const {
@@ -33,13 +34,26 @@ export default function QuizBuilderPage() {
     deleteVersion,
   } = useQuizBuilder();
 
-  const [activePhase, setActivePhase] = useState("phase_1");
+  const [activePhase, setActivePhase] = useState(null);
+
+  // When version changes, reset activePhase so it will re-auto-select
+  useEffect(() => {
+    setActivePhase(null);
+  }, [currentVersion]);
+
+  // When phases load, auto-set activePhase to first phase
+  useEffect(() => {
+    if (phases && phases.length > 0 && !activePhase) {
+      setActivePhase(phases[0].phase_name);
+    }
+  }, [phases, activePhase]);
 
   // Modals
   const [showQuestionBankModal, setShowQuestionBankModal] = useState(false);
   const [showQuestionEditorModal, setShowQuestionEditorModal] = useState(false);
   const [showPhaseConfigModal, setShowPhaseConfigModal] = useState(false);
   const [showLifetimeRuleModal, setShowLifetimeRuleModal] = useState(false);
+  const [showGlobalEscalateModal, setShowGlobalEscalateModal] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState(null);
 
   // NEW: when we create a brand new question from the "Add Question" flow,
@@ -114,6 +128,7 @@ export default function QuizBuilderPage() {
                 onPhaseChange={setActivePhase}
                 lifetimeRulesCount={lifetimeRules.length}
                 onShowLifetimeRules={() => setShowLifetimeRuleModal(true)}
+                onShowGlobalEscalate={() => setShowGlobalEscalateModal(true)}
               />
 
               <PhaseEditor
@@ -195,6 +210,14 @@ export default function QuizBuilderPage() {
             questionBank={questionBank}
             onClose={() => setShowLifetimeRuleModal(false)}
             onUpdate={loadVersionData}
+          />
+        )}
+
+        {showGlobalEscalateModal && (
+          <GlobalEscalateModal
+            versionId={currentVersion.id}
+            onClose={() => setShowGlobalEscalateModal(false)}
+            onSave={loadVersionData}
           />
         )}
       </div>

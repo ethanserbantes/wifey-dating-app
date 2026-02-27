@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import adminFetch from "@/utils/adminFetch";
 
 export function PhaseConfigModal({ phase, versionId, onClose, onSave }) {
   const initialCooldownThreshold =
@@ -21,14 +22,52 @@ export function PhaseConfigModal({ phase, versionId, onClose, onSave }) {
     cooldown_if_sum_gte: null,
   });
 
+  // Load saved config from backend when modal opens
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const res = await adminFetch(
+          `/api/admin/quiz-builder/versions/${versionId}/phases/${phase.phase_name}/config`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (data.config) {
+            setConfig((prev) => ({
+              ...prev,
+              ...data.config,
+            }));
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to load saved phase config:", err);
+      }
+    };
+
+    if (phase?.phase_name && versionId) {
+      loadConfig();
+    }
+  }, [phase?.phase_name, versionId]);
+
   const handleSave = async () => {
-    await fetch(`/api/admin/quiz-builder/versions/${versionId}/phases`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phaseName: phase.phase_name, config }),
-    });
-    onSave();
-    onClose();
+    try {
+      const res = await adminFetch(`/api/admin/quiz-builder/versions/${versionId}/phases`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phaseName: phase.phase_name, config }),
+      });
+
+      if (!res.ok) {
+        throw new Error(
+          `Failed to save phase config: [${res.status}] ${res.statusText}`
+        );
+      }
+
+      onSave();
+      onClose();
+    } catch (error) {
+      console.error(error);
+      alert("Failed to save phase settings. Please try again.");
+    }
   };
 
   return (

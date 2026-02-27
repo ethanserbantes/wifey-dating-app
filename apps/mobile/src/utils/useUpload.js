@@ -14,6 +14,8 @@ function useUpload() {
           const formData = new FormData();
           formData.append('file', input.reactNativeAsset.file);
           const uploadUrl = baseURL ? `${baseURL}/_create/api/upload/` : "/_create/api/upload/";
+          console.log(`[UPLOAD] Uploading to: ${uploadUrl}`);
+          console.log(`[UPLOAD] File: ${input.reactNativeAsset.file.name || 'unknown'}`);
           response = await fetch(uploadUrl, {
             method: 'POST',
             body: formData,
@@ -64,14 +66,28 @@ function useUpload() {
           body: input.buffer,
         });
       }
+      const responseText = await response.text();
+      console.log(`[UPLOAD] Status: ${response.status}`);
+      console.log(`[UPLOAD] Content-Type: ${response.headers.get('content-type')}`);
+      console.log(`[UPLOAD] Response (first 500 chars): ${responseText.substring(0, 500)}`);
+      
       if (!response.ok) {
         if (response.status === 413) {
           throw new Error('Upload failed: File too large.');
         }
-        throw new Error('Upload failed');
+        console.error(`[UPLOAD] HTTP Error ${response.status}: ${responseText}`);
+        throw new Error(`Upload failed: HTTP ${response.status}`);
       }
-      const data = await response.json();
-      return { url: data.url, mimeType: data.mimeType || null };
+      
+      try {
+        const data = JSON.parse(responseText);
+        console.log(`[UPLOAD] Success: ${data.url}`);
+        return { url: data.url, mimeType: data.mimeType || null };
+      } catch (parseErr) {
+        console.error(`[UPLOAD] JSON Parse error: ${parseErr.message}`);
+        console.error(`[UPLOAD] Response was: ${responseText}`);
+        throw new Error(`Upload response invalid: ${parseErr.message}`);
+      }
     } catch (uploadError) {
       if (uploadError instanceof Error) {
         return { error: uploadError.message };

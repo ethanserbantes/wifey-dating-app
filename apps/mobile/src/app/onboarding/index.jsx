@@ -80,9 +80,21 @@ export default function OnboardingWelcome() {
       console.error(e);
     }
 
+    // Only go to home if user has FULLY completed signup + screening + onboarding
     if (hasUser) {
-      router.replace("/home");
-      return;
+      try {
+        const profileRaw = await AsyncStorage.getItem("profile");
+        if (profileRaw) {
+          const profile = JSON.parse(profileRaw);
+          // Only allow home access if they've passed screening
+          if (profile?.screening_result === "pass") {
+            router.replace("/home");
+            return;
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
     }
 
     router.replace("/auth/login");

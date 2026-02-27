@@ -64,6 +64,12 @@ export const fetchWithHeaders = async (
     'x-createxyz-project-group-id': process.env.NEXT_PUBLIC_PROJECT_GROUP_ID,
   };
 
+  // Redirect /api/admin/* calls to backend
+  if (url.startsWith('/api/admin')) {
+    const backendUrl = process.env.VITE_API_URL || 'http://192.168.1.78:3001';
+    return originalFetch(backendUrl + url, init);
+  }
+
   const isExternalFetch = !isFirstPartyURL(url) && !isSecondPartyUrl(url);
   // we should not add headers to requests that don't go to our own server
   // or if it's an API request

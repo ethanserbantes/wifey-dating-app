@@ -3,6 +3,7 @@ export function PhaseTabs({
   onPhaseChange,
   lifetimeRulesCount,
   onShowLifetimeRules,
+  onShowGlobalEscalate,
 }) {
   return (
     <div className="border-b border-gray-200">
@@ -21,8 +22,14 @@ export function PhaseTabs({
           </button>
         ))}
         <button
+          onClick={onShowGlobalEscalate}
+          className="ml-auto px-4 py-3 text-sm text-purple-600 hover:text-purple-700"
+        >
+          Global Settings
+        </button>
+        <button
           onClick={onShowLifetimeRules}
-          className="ml-auto px-4 py-3 text-sm text-red-600 hover:text-red-700"
+          className="px-4 py-3 text-sm text-red-600 hover:text-red-700"
         >
           Lifetime Rules ({lifetimeRulesCount})
         </button>

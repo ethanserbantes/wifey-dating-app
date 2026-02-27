@@ -107,7 +107,7 @@ export function useQuizBuilder() {
       .filter(
         (v) => v.id != null && v.version_number != null && v.status != null,
       )
-      .filter((v) => (v.audience_gender || "ALL") === audienceGender);
+      .filter((v) => v.audience_gender === "ALL" || v.audience_gender === audienceGender);
   }, [versions, audienceGender]);
 
   // If the user switches Male/Female, auto-select that quiz's active/draft version.
@@ -141,13 +141,16 @@ export function useQuizBuilder() {
   const loadVersions = async () => {
     try {
       setError(null);
+      console.log("📥 Loading quiz versions...");
       const res = await adminFetch("/api/admin/quiz-builder/versions");
+      console.log("📥 Response status:", res.status);
       if (!res.ok) {
         throw new Error(
           `Failed to load versions: ${res.status} ${res.statusText}`,
         );
       }
       const data = await res.json();
+      console.log("📥 Received versions:", data.versions?.length || 0);
       const validVersions = (data.versions || [])
         .filter((v) => v != null && typeof v === "object")
         .filter(
@@ -230,7 +233,7 @@ export function useQuizBuilder() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          notes: `New ${audienceGender.toLowerCase()} draft`,
+          name: `New ${audienceGender.toLowerCase()} draft - ${Date.now()}`,
           audienceGender,
         }),
       });

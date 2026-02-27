@@ -8,6 +8,7 @@ import {
   Copy,
 } from "lucide-react";
 import { useState } from "react";
+import adminFetch from "@/utils/adminFetch";
 
 export function QuizBuilderHeader({
   versions,
@@ -50,6 +51,7 @@ export function QuizBuilderHeader({
   };
 
   const getStatusLabel = (status) => {
+    if (!status) return "Unknown";
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
@@ -60,7 +62,7 @@ export function QuizBuilderHeader({
     }
 
     try {
-      const res = await fetch(
+      const res = await adminFetch(
         `/api/admin/quiz-builder/versions/${currentVersion.id}`,
         {
           method: "PATCH",

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import adminFetch from "@/utils/adminFetch";
 import { RuleEditorModal } from "./RuleEditorModal";
 
 export function LifetimeRulesModal({
@@ -22,30 +23,52 @@ export function LifetimeRulesModal({
       ? `/api/admin/quiz-builder/versions/${versionId}/lifetime-rules/${rule.id}`
       : `/api/admin/quiz-builder/versions/${versionId}/lifetime-rules`;
 
-    await fetch(url, {
-      method: rule.id ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ruleName: rule.rule_name,
-        ruleJson: rule.rule_json,
-      }),
-    });
+    try {
+      const res = await adminFetch(url, {
+        method: rule.id ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ruleName: rule.rule_name,
+          ruleJson: rule.rule_json,
+        }),
+      });
 
-    onUpdate();
-    setEditingRule(null);
+      if (!res.ok) {
+        throw new Error(
+          `Failed to save rule: [${res.status}] ${res.statusText}`
+        );
+      }
+
+      onUpdate();
+      setEditingRule(null);
+    } catch (error) {
+      console.error(error);
+      alert("Failed to save rule. Please try again.");
+    }
   };
 
   const deleteRule = async (ruleId) => {
     if (!confirm("Delete this rule?")) return;
 
-    await fetch(
-      `/api/admin/quiz-builder/versions/${versionId}/lifetime-rules/${ruleId}`,
-      {
-        method: "DELETE",
-      },
-    );
+    try {
+      const res = await adminFetch(
+        `/api/admin/quiz-builder/versions/${versionId}/lifetime-rules/${ruleId}`,
+        {
+          method: "DELETE",
+        },
+      );
 
-    onUpdate();
+      if (!res.ok) {
+        throw new Error(
+          `Failed to delete rule: [${res.status}] ${res.statusText}`
+        );
+      }
+
+      onUpdate();
+    } catch (error) {
+      console.error(error);
+      alert("Failed to delete rule. Please try again.");
+    }
   };
 
   return (

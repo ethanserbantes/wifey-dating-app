@@ -1,4 +1,5 @@
 import { Plus, Edit, Trash2 } from "lucide-react";
+import adminFetch from "@/utils/adminFetch";
 
 export function PhaseEditor({
   phase,
@@ -12,13 +13,25 @@ export function PhaseEditor({
   if (!phase) return <div className="p-6 text-gray-500">Loading phase...</div>;
 
   const removeQuestionFromPhase = async (questionId) => {
-    await fetch(
-      `/api/admin/quiz-builder/versions/${versionId}/phases/${phase.phase_name}/questions?questionId=${questionId}`,
-      {
-        method: "DELETE",
-      },
-    );
-    onUpdate();
+    try {
+      const res = await adminFetch(
+        `/api/admin/quiz-builder/versions/${versionId}/phases/${phase.phase_name}/questions/${questionId}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      if (!res.ok) {
+        throw new Error(
+          `Failed to remove question: [${res.status}] ${res.statusText}`
+        );
+      }
+
+      onUpdate();
+    } catch (error) {
+      console.error(error);
+      alert("Failed to remove question. Please try again.");
+    }
   };
 
   return (
@@ -46,9 +59,6 @@ export function PhaseEditor({
 
       <div className="space-y-3">
         {phase.questions?.map((q) => {
-          const fullQuestion = questionBank.find(
-            (qb) => qb.id === q.question_id,
-          );
           return (
             <div
               key={q.id}
@@ -57,21 +67,21 @@ export function PhaseEditor({
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="font-medium text-gray-900 mb-2">
-                    {q.question_text}
+                    {q.text || q.question_text}
                   </div>
                   <div className="text-sm text-gray-500">
-                    {fullQuestion?.answers?.length || 0} answers
+                    {q.answers?.length || 0} answers
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => onEditQuestion(fullQuestion)}
+                    onClick={() => onEditQuestion(q)}
                     className="p-2 text-gray-600 hover:text-blue-600"
                   >
                     <Edit size={16} />
                   </button>
                   <button
-                    onClick={() => removeQuestionFromPhase(q.question_id)}
+                    onClick={() => removeQuestionFromPhase(q.id)}
                     className="p-2 text-gray-600 hover:text-red-600"
                   >
                     <Trash2 size={16} />

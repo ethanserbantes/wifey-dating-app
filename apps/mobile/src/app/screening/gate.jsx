@@ -85,7 +85,8 @@ export default function ScreeningGate() {
     return String(profile?.verification_status || "none");
   }, [profile?.verification_status]);
 
-  const isVerified = profile?.is_verified === true;
+  // Show pre-quiz intro if either verified OR photo was uploaded (pending review)
+  const isVerified = profile?.is_verified === true || !!profile?.verification_photo_url;
 
   const verificationHint = useMemo(() => {
     if (verificationStatus === "pending") {

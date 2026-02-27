@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
+import adminFetch from "@/utils/adminFetch";
 
 export function QuestionEditorModal({
   question,
@@ -9,13 +10,13 @@ export function QuestionEditorModal({
   audienceGender,
 }) {
   const [questionText, setQuestionText] = useState(
-    question?.question_text || "",
+    question?.text || question?.question_text || "",
   );
   const [isMandatory, setIsMandatory] = useState(
     question?.is_mandatory || false,
   );
   const [allowMultiple, setAllowMultiple] = useState(
-    question?.allow_multiple || false,
+    question?.allow_multiple || question?.allowmultiple || false,
   );
 
   // NEW: for multi-select questions, enforce a minimum number of selections
@@ -31,10 +32,25 @@ export function QuestionEditorModal({
   );
 
   const [answers, setAnswers] = useState(
-    question?.answers || [{ text: "", weight: 0 }],
+    (question?.answers?.map((a) => ({
+      text: a.text || a.answer_text || "",
+      weight: a.weight ?? 0,
+    })) || [{ text: "", weight: 0 }]),
   );
 
   const handleSave = async () => {
+    // Validate
+    if (!questionText.trim()) {
+      alert("Question text is required");
+      return;
+    }
+
+    const validAnswers = answers.filter((a) => (a.text || a.answer_text)?.trim());
+    if (validAnswers.length < 2) {
+      alert("At least 2 answers are required");
+      return;
+    }
+
     const url = question
       ? `/api/admin/quiz-builder/questions/${question.id}`
       : "/api/admin/quiz-builder/questions";
@@ -42,18 +58,13 @@ export function QuestionEditorModal({
     const method = question ? "PUT" : "POST";
 
     try {
-      const res = await fetch(url, {
+      const res = await adminFetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          questionText,
-          isMandatory,
-          allowMultiple,
-          minSelectionsRequired: allowMultiple ? minSelectionsRequired : null,
-          minSelectionsPenalty: allowMultiple ? minSelectionsPenalty : null,
-          isActive: true,
-          audienceGender: audienceGender || "ALL",
-          answers: answers.map((a) => ({
+          text: questionText,
+          type: allowMultiple ? "multiple_select" : "single_select",
+          options: validAnswers.map((a) => ({
             text: a.text || a.answer_text,
             weight: a.weight,
           })),
@@ -75,7 +86,7 @@ export function QuestionEditorModal({
         afterCreateAddToPhase?.versionId &&
         afterCreateAddToPhase?.phase
       ) {
-        const addRes = await fetch(
+        const addRes = await adminFetch(
           `/api/admin/quiz-builder/versions/${afterCreateAddToPhase.versionId}/phases/${afterCreateAddToPhase.phase}/questions`,
           {
             method: "POST",
@@ -220,7 +231,7 @@ export function QuestionEditorModal({
                   <div key={idx} className="flex gap-2">
                     <input
                       type="text"
-                      value={answer.text || answer.answer_text}
+                      value={answer.text ?? ""}
                       onChange={(e) => {
                         const newAnswers = [...answers];
                         newAnswers[idx] = { ...answer, text: e.target.value };
@@ -230,7 +241,7 @@ export function QuestionEditorModal({
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
                     />
                     <select
-                      value={answer.weight}
+                      value={answer.weight ?? 0}
                       onChange={(e) => {
                         const newAnswers = [...answers];
                         newAnswers[idx] = {

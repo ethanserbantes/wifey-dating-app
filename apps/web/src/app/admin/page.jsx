@@ -41,6 +41,10 @@ export default function AdminLoginPage() {
       // Fallback (in case cookies are blocked): store the session token.
       if (data.sessionToken) {
         setAdminSessionToken(data.sessionToken);
+        console.log("✅ Token saved:", data.sessionToken.substring(0, 20) + "...");
+        console.log("✅ localStorage admin_session_token:", localStorage.getItem("admin_session_token"));
+      } else {
+        console.error("❌ No sessionToken in response:", data);
       }
 
       window.location.href = "/admin/dashboard";
